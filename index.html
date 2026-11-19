@@ -1,2 +1,474 @@
 <!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>港股五大底部反轉型態掃描儀 | HKEX Scanner</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #131926;
+      --border: #1f293d;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --up: #10b981;
+      --down: #ef4444;
+      --accent: #38bdf8;
+      --w: #14b8a6;
+      --ihs: #3b82f6;
+      --round: #a855f7;
+      --v: #f97316;
+      --flat: #22c55e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", "Microsoft JhengHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .title h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; }
+    .title p { font-size: 0.85rem; color: var(--muted); }
+    .meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.85rem; }
+    .badge {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: var(--accent);
+    }
+    .btn {
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
+    .demo-banner {
+      display: none;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #f59e0b;
+      color: #fcd34d;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 0.88rem;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .kpi-card.active { border-color: var(--accent); background: #172235; }
+    .kpi-label { font-size: 0.82rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .kpi-val { font-size: 1.6rem; font-weight: 700; margin-top: 6px; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    input, select {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    input { flex: 1; min-width: 200px; }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 980px) { .main-grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .list-wrap { max-height: 640px; overflow-y: auto; }
+    .stock-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .stock-item:hover { background: #1a2333; }
+    .stock-item.selected { background: #1e2c44; border-left: 3px solid var(--accent); }
+    .code { font-weight: 700; font-size: 0.95rem; }
+    .name { font-size: 0.8rem; color: var(--muted); max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .tag {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .right-col { text-align: right; }
+    .price { font-weight: 700; font-size: 0.95rem; }
+    .chg.up { color: var(--up); font-size: 0.82rem; }
+    .chg.down { color: var(--down); font-size: 0.82rem; }
+    .vol-ratio { font-size: 0.75rem; color: var(--accent); margin-top: 2px; }
+    .chart-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chart-box { position: relative; padding: 12px; height: 560px; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .tooltip {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      pointer-events: none;
+      display: none;
+    }
+    .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <h1>港股五大底部反轉型態掃描儀</h1>
+      <p>全港上市正股每日收市自動掃描（含成交量確認）</p>
+    </div>
+    <div class="meta">
+      <span class="badge" id="updatedAt">更新時間：載入中...</span>
+      <span class="badge" id="scannedCount">掃描股數：-</span>
+      <button class="btn" onclick="exportCSV()">匯出 CSV</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="demo-banner" id="demoBanner">
+      尚未偵測到 <code>data/signals.json</code>（請先到 GitHub Actions 手動執行一次掃描），目前顯示示範數據。
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="controls">
+      <input type="text" id="searchInput" placeholder="搜尋股票代號或名稱 (例如 0700、TENCENT)..." />
+      <select id="sortSelect">
+        <option value="volRatio">排序：量比 (高至低)</option>
+        <option value="changePct">排序：升跌幅 (高至低)</option>
+        <option value="price">排序：股價 (高至低)</option>
+      </select>
+    </div>
+
+    <div class="main-grid">
+      <div class="card">
+        <div class="list-wrap" id="stockList"></div>
+      </div>
+      <div class="card">
+        <div class="chart-header">
+          <div>
+            <strong id="chartTitle">請選擇左側股票查看 K 線圖</strong>
+            <div id="chartSub" style="font-size:0.82rem;color:var(--muted);"></div>
+          </div>
+          <div id="chartTags" class="tags"></div>
+        </div>
+        <div class="chart-box">
+          <canvas id="klineCanvas"></canvas>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PATTERN_META = {
+      ALL:   { label: "全部訊號", color: "#38bdf8" },
+      W:     { label: "1. 雙底 (W底)", color: "#14b8a6" },
+      IHS:   { label: "2. 頭肩底", color: "#3b82f6" },
+      ROUND: { label: "3. 圓弧底", color: "#a855f7" },
+      V:     { label: "4. V型底", color: "#f97316" },
+      FLAT:  { label: "5. 潛伏底", color: "#22c55e" }
+    };
+
+    let allSignals = [];
+    let activeFilter = "ALL";
+    let selectedStock = null;
+
+    function generateDemoData() {
+      const makeCandles = (base, volBase) => {
+        const arr = [];
+        let p = base;
+        for (let i = 0; i < 60; i++) {
+          const d = new Date(Date.now() - (60 - i) * 86400000).toISOString().slice(0, 10);
+          const o = p;
+          const c = +(o * (1 + (Math.random() - 0.48) * 0.03)).toFixed(2);
+          const h = +(Math.max(o, c) * (1 + Math.random() * 0.015)).toFixed(2);
+          const l = +(Math.min(o, c) * (1 - Math.random() * 0.015)).toFixed(2);
+          const v = Math.round(volBase * (i === 59 ? 2.1 : 0.7 + Math.random() * 0.6));
+          arr.push({ t: d, o, h, l, c, v });
+          p = c;
+        }
+        return arr;
+      };
+      return {
+        updatedAt: "示範模式",
+        scannedCount: 2600,
+        signals: [
+          { code: "0700.HK", name: "TENCENT", price: 428.6, changePct: 3.42, volRatio: 2.15, patterns: [{ type: "W", name: "雙底突破 (W底)", neckline: 420.0 }], candles: makeCandles(410, 18000000) },
+          { code: "9988.HK", name: "BABA-W", price: 96.8, changePct: 4.10, volRatio: 1.88, patterns: [{ type: "FLAT", name: "潛伏底突破 (橫盤突破)", neckline: 94.5 }], candles: makeCandles(92, 42000000) },
+          { code: "1810.HK", name: "XIAOMI-W", price: 28.4, changePct: 5.18, volRatio: 2.45, patterns: [{ type: "V", name: "V型底 (尖底)", neckline: 25.1 }], candles: makeCandles(26, 95000000) }
+        ]
+      };
+    }
+
+    async function init() {
+      try {
+        const res = await fetch(`./data/signals.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error("Not found");
+        const data = await res.json();
+        loadPayload(data);
+      } catch (e) {
+        document.getElementById("demoBanner").style.display = "block";
+        loadPayload(generateDemoData());
+      }
+    }
+
+    function loadPayload(data) {
+      allSignals = data.signals || [];
+      document.getElementById("updatedAt").textContent = `更新時間：${data.updatedAt || "-"}`;
+      document.getElementById("scannedCount").textContent = `掃描股數：${data.scannedCount || "-"}`;
+      renderKPIs();
+      renderList();
+      if (allSignals.length > 0) selectStock(allSignals[0]);
+    }
+
+    function renderKPIs() {
+      const counts = { ALL: allSignals.length, W: 0, IHS: 0, ROUND: 0, V: 0, FLAT: 0 };
+      allSignals.forEach(s => s.patterns.forEach(p => { if (counts[p.type] !== undefined) counts[p.type]++; }));
+      const grid = document.getElementById("kpiGrid");
+      grid.innerHTML = Object.keys(PATTERN_META).map(key => `
+        <div class="kpi-card ${activeFilter === key ? "active" : ""}" onclick="setFilter('${key}')">
+          <div class="kpi-label"><span class="dot" style="background:${PATTERN_META[key].color}"></span>${PATTERN_META[key].label}</div>
+          <div class="kpi-val">${counts[key]}</div>
+        </div>
+      `).join("");
+    }
+
+    function setFilter(type) {
+      activeFilter = type;
+      renderKPIs();
+      renderList();
+    }
+
+    function getFiltered() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const sortBy = document.getElementById("sortSelect").value;
+      return allSignals
+        .filter(s => {
+          const matchType = activeFilter === "ALL" || s.patterns.some(p => p.type === activeFilter);
+          const matchQ = !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+          return matchType && matchQ;
+        })
+        .sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+    }
+
+    function renderList() {
+      const list = getFiltered();
+      const wrap = document.getElementById("stockList");
+      if (!list.length) {
+        wrap.innerHTML = `<div class="empty">暫無符合條件的港股訊號</div>`;
+        return;
+      }
+      wrap.innerHTML = list.map(s => `
+        <div class="stock-item ${selectedStock && selectedStock.code === s.code ? "selected" : ""}" onclick='selectStockByCode("${s.code}")'>
+          <div>
+            <div class="code">${s.code}</div>
+            <div class="name">${s.name}</div>
+            <div class="tags">
+              ${s.patterns.map(p => `<span class="tag" style="background:${(PATTERN_META[p.type]||{}).color||'#475569'}">${p.name}</span>`).join("")}
+            </div>
+          </div>
+          <div class="right-col">
+            <div class="price">${s.price.toFixed(2)}</div>
+            <div class="chg ${s.changePct >= 0 ? "up" : "down"}">${s.changePct >= 0 ? "+" : ""}${s.changePct.toFixed(2)}%</div>
+            <div class="vol-ratio">量比 ${s.volRatio}x</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function selectStockByCode(code) {
+      const s = allSignals.find(x => x.code === code);
+      if (s) selectStock(s);
+    }
+
+    function selectStock(s) {
+      selectedStock = s;
+      renderList();
+      document.getElementById("chartTitle").textContent = `${s.code} ${s.name}`;
+      document.getElementById("chartSub").textContent = `現價：${s.price.toFixed(2)} | 升跌：${s.changePct >= 0 ? "+" : ""}${s.changePct.toFixed(2)}% | 量比：${s.volRatio}x`;
+      document.getElementById("chartTags").innerHTML = s.patterns.map(p =>
+        `<span class="tag" style="background:${(PATTERN_META[p.type]||{}).color||'#475569'}">${p.name} (關鍵位 ${p.neckline})</span>`
+      ).join("");
+      drawChart(s);
+    }
+
+    function drawChart(stock, hoverIdx = -1) {
+      const canvas = document.getElementById("klineCanvas");
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width, H = rect.height;
+      const candles = stock.candles || [];
+      if (!candles.length) return;
+
+      const pad = { top: 20, right: 62, bottom: 28, left: 10 };
+      const chartH = (H - pad.top - pad.bottom) * 0.72;
+      const volH = (H - pad.top - pad.bottom) * 0.22;
+      const volTop = pad.top + chartH + 14;
+      const plotW = W - pad.left - pad.right;
+
+      const maxP = Math.max(...candles.map(c => c.h)) * 1.02;
+      const minP = Math.min(...candles.map(c => c.l)) * 0.98;
+      const maxV = Math.max(...candles.map(c => c.v)) || 1;
+
+      const xAt = i => pad.left + (i + 0.5) * (plotW / candles.length);
+      const yAt = p => pad.top + (1 - (p - minP) / (maxP - minP || 1)) * chartH;
+
+      // 網格線
+      ctx.strokeStyle = "#1f293d";
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "11px sans-serif";
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (chartH / 4) * i;
+        const pVal = maxP - ((maxP - minP) / 4) * i;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+        ctx.fillText(pVal.toFixed(2), W - pad.right + 6, y + 4);
+      }
+
+      // 關鍵頸線/支撐線
+      stock.patterns.forEach(p => {
+        if (!p.neckline) return;
+        const ny = yAt(p.neckline);
+        if (ny >= pad.top && ny <= pad.top + chartH) {
+          ctx.save();
+          ctx.strokeStyle = (PATTERN_META[p.type] || {}).color || "#38bdf8";
+          ctx.setLineDash([5, 4]);
+          ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(pad.left, ny); ctx.lineTo(W - pad.right, ny); ctx.stroke();
+          ctx.restore();
+        }
+      });
+
+      // 陰陽燭與成交量
+      const bw = Math.max(2, (plotW / candles.length) * 0.65);
+      candles.forEach((c, i) => {
+        const x = xAt(i);
+        const isUp = c.c >= c.o;
+        const color = isUp ? "#10b981" : "#ef4444";
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+
+        ctx.beginPath();
+        ctx.moveTo(x, yAt(c.h));
+        ctx.lineTo(x, yAt(c.l));
+        ctx.stroke();
+
+        const yO = yAt(c.o), yC = yAt(c.c);
+        ctx.fillRect(x - bw / 2, Math.min(yO, yC), bw, Math.max(1.5, Math.abs(yC - yO)));
+
+        const vh = (c.v / maxV) * volH;
+        ctx.globalAlpha = 0.45;
+        ctx.fillRect(x - bw / 2, volTop + volH - vh, bw, vh);
+        ctx.globalAlpha = 1;
+      });
+
+      // 十字游標
+      if (hoverIdx >= 0 && hoverIdx < candles.length) {
+        const x = xAt(hoverIdx);
+        ctx.strokeStyle = "rgba(148,163,184,0.5)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, H - pad.bottom); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    const canvasEl = document.getElementById("klineCanvas");
+    const tooltipEl = document.getElementById("tooltip");
+    canvasEl.addEventListener("mousemove", e => {
+      if (!selectedStock || !selectedStock.candles.length) return;
+      const rect = canvasEl.getBoundingClientRect();
+      const plotW = rect.width - 72;
+      const idx = Math.floor(((e.clientX - rect.left - 10) / plotW) * selectedStock.candles.length);
+      if (idx >= 0 && idx < selectedStock.candles.length) {
+        const c = selectedStock.candles[idx];
+        tooltipEl.style.display = "block";
+        tooltipEl.innerHTML = `<strong>${c.t}</strong><br>開:${c.o} 高:${c.h} 低:${c.l} 收:${c.c}<br>量:${c.v.toLocaleString()}`;
+        drawChart(selectedStock, idx);
+      }
+    });
+    canvasEl.addEventListener("mouseleave", () => {
+      tooltipEl.style.display = "none";
+      if (selectedStock) drawChart(selectedStock, -1);
+    });
+
+    function exportCSV() {
+      const list = getFiltered();
+      const rows = [["代號", "名稱", "現價", "升跌幅(%)", "量比", "型態"]];
+      list.forEach(s => rows.push([s.code, s.name, s.price, s.changePct, s.volRatio, s.patterns.map(p => p.name).join(" / ")]));
+      const csv = "\uFEFF" + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+      a.download = `hkex_bottom_signals_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+    }
+
+    document.getElementById("searchInput").addEventListener("input", renderList);
+    document.getElementById("sortSelect").addEventListener("change", renderList);
+    window.addEventListener("resize", () => { if (selectedStock) drawChart(selectedStock); });
+    init();
+  </script>
+</body>
 </html>
