@@ -1,0 +1,61 @@
+name: Daily HKEX Bottom Reversal Scan & Deploy
+
+on:
+  schedule:
+    # UTC 09:30 = 香港時間 (HKT) 17:30，每週一至五港股收市後執行
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch: # 允許手動點擊執行
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  scan-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run HKEX Pattern Scanner
+        run: python hkex_bottom_scan.py
+
+      - name: Commit updated signals.json
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/signals.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update HKEX bottom reversal signals ($(date -u +'%Y-%m-%d'))"
+          git push
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
