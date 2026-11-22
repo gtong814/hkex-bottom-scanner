@@ -3,7 +3,7 @@ name: Daily HKEX Bottom Reversal Scan & Deploy
 on:
   schedule:
     # UTC 09:30 = 香港時間 (HKT) 17:30，每週一至五港股收市後執行
-    - cron: '30 9 * * 1-5'
+    - cron: '30 8 * * 1-5'
   workflow_dispatch: # 允許手動點擊執行
 
 permissions:
